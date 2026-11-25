@@ -39,6 +39,11 @@ CFG = {
     "remote": "git@github-valheim:andilar/Valheim_Status.git",
     "branch": "data",
     "interval": 120,          # seconds between cycles
+    # internet latency of the server Mac: anycast resolvers, nearby everywhere, reliably answer ICMP.
+    # The second target is only used when the first fails completely.
+    # Only the label is published (the sanitizer rejects anything that looks like an IP).
+    "ping_targets": [("1.1.1.1", "Cloudflare"), ("8.8.8.8", "Google")],
+    "ping_count": 5,
     "git_name": "Valheim Status Collector",
     "git_email": "2079761+andilar@users.noreply.github.com",
 }
@@ -155,6 +160,8 @@ CREATE INDEX IF NOT EXISTS ev_file ON events(file_id, line_no);
 CREATE TABLE IF NOT EXISTS world_keys (
   key TEXT PRIMARY KEY, first_seen INTEGER, initial INTEGER, save_number INTEGER);
 CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
+CREATE TABLE IF NOT EXISTS pings (
+  ts INTEGER PRIMARY KEY, target TEXT, avg REAL, min REAL, max REAL, jitter REAL, loss REAL);
 """
 
 
@@ -596,6 +603,61 @@ def server_process():
     except Exception:
         return {"pid": pid, "cpu": None, "mem_mb": None}
 
+# ---------------------------------------------------------------- network
+
+PING_LOSS_RE = re.compile(r"(\d+) packets transmitted, (\d+) (?:packets )?received")
+PING_RTT_RE = re.compile(r"= ([\d.]+)/([\d.]+)/([\d.]+)/([\d.]+) ms")
+
+
+def measure_ping():
+    """Ping the targets in order; return the first that answers at all (or 100 % loss)."""
+    n = CFG["ping_count"]
+    result = None
+    for target, label in CFG["ping_targets"]:
+        try:
+            out = subprocess.run(["/sbin/ping", "-c", str(n), "-i", "0.2", "-t", "5", "-q", target],
+                                 capture_output=True, text=True, timeout=15).stdout
+        except Exception as e:
+            log.warning("ping %s failed: %s", target, e)
+            continue
+        m = PING_LOSS_RE.search(out)
+        sent, recv = (int(m.group(1)), int(m.group(2))) if m else (n, 0)
+        r = {"target": label, "loss": 100.0 * (sent - recv) / max(sent, 1),
+             "avg": None, "min": None, "max": None, "jitter": None}
+        rtt = PING_RTT_RE.search(out)
+        if recv and rtt:
+            r.update(min=float(rtt.group(1)), avg=float(rtt.group(2)), max=float(rtt.group(3)),
+                     jitter=float(rtt.group(4)))
+            return r
+        result = result or r
+    return result or {"target": CFG["ping_targets"][0][1], "loss": 100.0, "avg": None, "min": None,
+                      "max": None, "jitter": None}
+
+
+def record_ping(con):
+    r = measure_ping()
+    con.execute("INSERT OR REPLACE INTO pings(ts, target, avg, min, max, jitter, loss) VALUES(?,?,?,?,?,?,?)",
+                (int(time.time()), r["target"], r["avg"], r["min"], r["max"], r["jitter"], r["loss"]))
+    con.commit()
+
+
+def ping_export(con, now):
+    last = con.execute("SELECT ts, target, avg, min, max, jitter, loss FROM pings ORDER BY ts DESC LIMIT 1").fetchone()
+    current = None
+    if last:
+        current = dict(zip(("at", "target", "avg_ms", "min_ms", "max_ms", "jitter_ms", "loss_pct"), last))
+        current = {k: (round(v, 1) if isinstance(v, float) else v) for k, v in current.items()}
+
+    def r1(v):
+        return None if v is None else round(v, 1)
+    # full resolution for 48 h, hourly aggregates for 90 days
+    recent = [[ts, r1(avg), r1(loss)] for ts, avg, loss in con.execute(
+        "SELECT ts, avg, loss FROM pings WHERE ts >= ? ORDER BY ts", (now - 48 * 3600,))]
+    hourly = [[h * 3600, r1(a), r1(mx), r1(l)] for h, a, mx, l in con.execute(
+        "SELECT ts / 3600 AS h, AVG(avg), MAX(max), AVG(loss) FROM pings WHERE ts >= ? GROUP BY h ORDER BY h",
+        (now - 90 * 86400,))]
+    return current, {"recent": recent, "hourly": hourly}
+
 # ---------------------------------------------------------------- export
 
 
@@ -662,6 +724,7 @@ def export(con, outdir):
     defeated = sum(1 for b in bosses if b["defeated"])
     tier = next((b["biome"] for b in bosses if not b["defeated"]), "Tiefer Norden")
 
+    ping_now, ping_hist = ping_export(con, now)
     online = sorted(({"name": s.name, "since": s.start} for s in sessions if s.end is None and s.start),
                     key=lambda p: p["since"])
     status = {
@@ -671,6 +734,7 @@ def export(con, outdir):
                   "save_ok": world.get("ok", False), "save_error": None if world.get("ok") else world.get("error"),
                   "save_read_at": world.get("at")},
         "players_online": online,
+        "network": ping_now,
         "progress": {"defeated": defeated, "total": len(BOSSES), "current_tier": tier,
                      "bosses": bosses, "new_bosses": [], "milestones": milestones,
                      "unknown_keys": unknown},
@@ -683,6 +747,7 @@ def export(con, outdir):
         "deaths": [{"player": n, "at": t} for n, t in sorted(deaths, key=lambda d: d[1])],
         "runs": runs_out,
         "backups": backups()[:50],
+        "ping": ping_hist,
     }
     os.makedirs(outdir, exist_ok=True)
     for name, obj in (("status.json", status), ("history.json", history)):
@@ -764,6 +829,10 @@ def meta_set_file(k, v):
 
 def cycle(con, outdir, push):
     n = ingest_logs(con)
+    try:
+        record_ping(con)
+    except Exception as e:  # never let the network probe break the export
+        log.warning("ping failed: %s", e)
     status, _ = export(con, outdir)
     s = status["server"]
     log.info("cycle: +%d events, server %s, %d online", n, s["state"], len(status["players_online"]))

@@ -29,6 +29,13 @@ Welt-Save ────┼─> valheim_collector.py ─ alle 2 min ─> Branch da
 - Die Seite (`index.html`, `assets/`) lädt die JSON-Dateien von
   `raw.githubusercontent.com/andilar/Valheim_Status/data/…`. GitHub cacht diese Dateien bis zu 5 Minuten.
 
+### Ping
+Bei jedem Durchlauf schickt der Collector 5 Pings an **1.1.1.1** (Cloudflare). Antwortet der gar nicht,
+geht die Messung an 8.8.8.8 (Google). Beide sind Anycast-Adressen, also überall in der Nähe und sehr
+zuverlässig. Veröffentlicht werden nur der Name des Ziels, Ø/Min/Max, Jitter und Paketverlust.
+Die Messung zeigt die Internetverbindung des Server-Macs, nicht den Ping der Spieler. Den gibt das
+Server-Log nicht her.
+
 ### Was nie veröffentlicht wird
 Server-Passwort, IP-Adressen, Dateipfade, rohe Log-Zeilen, PlayFab/Steam-IDs und die SQLite-Datei.
 `assert_sanitized()` bricht den Export ab, falls doch etwas danach aussieht.

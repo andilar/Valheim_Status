@@ -229,8 +229,21 @@
       "Nr. " + (st.last_save.number || "?") + " · " + st.last_save.duration_ms + " ms"));
     if (live && s.cpu != null) tiles.appendChild(tile("Server-Last", s.cpu.toLocaleString("de-DE", { maximumFractionDigits: 0 }) + " % CPU",
       (s.mem_mb / 1024).toLocaleString("de-DE", { maximumFractionDigits: 1 }) + " GB RAM"));
+    var net = st.network;
+    if (net && now() - net.at < UNKNOWN_S) {
+      if (net.avg_ms == null) tiles.appendChild(tile("Ping", "kein Internet", "zu " + net.target + " · 100 % Verlust"));
+      else tiles.appendChild(tile("Ping", Math.round(net.avg_ms) + " ms",
+        pingQuality(net.avg_ms, net.loss_pct) + " · zu " + net.target +
+        (net.loss_pct ? " · " + Math.round(net.loss_pct) + " % Verlust" : "")));
+    }
     if (s.disk_free_bytes != null) tiles.appendChild(tile("Freier Speicher", gb(s.disk_free_bytes), "auf dem Server-Mac"));
     if (st.last_backup) tiles.appendChild(tile("Letztes Backup", ago(st.last_backup.at), dt(st.last_backup.at)));
+  }
+
+  function pingQuality(ms, loss) {
+    if (loss >= 20 || ms >= 150) return "schlecht";
+    if (loss > 0 || ms >= 60) return "ok";
+    return "gut";
   }
 
   // ---------------------------------------------------------------- progress
@@ -495,6 +508,79 @@
     }), [false, false, true, false]);
   }
 
+  function renderPing(r0, r1) {
+    var p = state.history.ping || { recent: [], hourly: [] };
+    // fine resolution where it exists (48 h), hourly averages beyond that
+    var fine = r1 - r0 <= 48 * 3600 + 60;
+    var pts = (fine ? p.recent.map(function (x) { return { t: x[0], v: x[1], loss: x[2] }; })
+                    : p.hourly.map(function (x) { return { t: x[0], v: x[1], max: x[2], loss: x[3] }; }))
+      .filter(function (x) { return x.t >= r0 - 3600 && x.t <= r1; });
+    var node = $("chart-ping"), f = chartFrame(node, 170);
+    if (!pts.length) {
+      clear(node).appendChild(el("div", { class: "empty", text: "Noch keine Messwerte in diesem Zeitraum." }));
+      $("ping-summary").textContent = ""; clear($("tbl-ping")); return;
+    }
+    var vals = pts.filter(function (x) { return x.v != null; }).map(function (x) { return x.v; });
+    var top = Math.max(20, vals.length ? Math.max.apply(null, vals) : 20);
+    var step = top <= 20 ? 5 : top <= 50 ? 10 : top <= 100 ? 25 : top <= 250 ? 50 : 100;
+    var max = Math.ceil(top / step) * step;
+    f.l = 40; f.yfmt = function (v) { return Math.round(v) + " ms"; };
+    yAxis(f, max, Math.round(max / step));
+    var X = function (t) { return f.l + (f.w - f.l - f.r) * (Math.max(r0, t) - r0) / (r1 - r0); };
+    var Y = function (v) { return f.h - f.b - (f.h - f.t - f.b) * Math.min(v, max) / max; };
+    niceTicks(r0, r1, f.w - f.l).forEach(function (tk) {
+      f.svg.appendChild(sv("text", { x: X(tk.t), y: f.h - 6, "text-anchor": "middle", text: tk.label }));
+    });
+    // line breaks at gaps (no data for > 3 intervals) and at total loss
+    var gapS = fine ? 600 : 3 * 3600, d = "", prev = null;
+    pts.forEach(function (x) {
+      if (x.v == null) { prev = null; return; }
+      d += (prev && x.t - prev.t <= gapS ? "L" : "M") + X(x.t).toFixed(1) + "," + Y(x.v).toFixed(1);
+      prev = x;
+    });
+    f.svg.appendChild(sv("path", { d: d, fill: "none", stroke: "var(--s1)", "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+    pts.forEach(function (x) {
+      if (x.loss >= 100 || x.v == null) {
+        var cx = X(x.t), cy = f.h - f.b - 6;
+        f.svg.appendChild(sv("path", { d: "M" + (cx - 4) + "," + (cy - 4) + "l8,8m0,-8l-8,8", stroke: "var(--critical)", "stroke-width": 2, "stroke-linecap": "round" }));
+      }
+    });
+    var cross = sv("line", { y1: f.t, y2: f.h - f.b, stroke: "var(--axis)", "stroke-width": 1, visibility: "hidden" });
+    var dot = sv("circle", { r: 4, fill: "var(--s1)", stroke: "var(--surface)", "stroke-width": 2, visibility: "hidden" });
+    f.svg.appendChild(cross); f.svg.appendChild(dot);
+    var hit = sv("rect", { x: f.l, y: 0, width: f.w - f.l - f.r, height: f.h, fill: "transparent", tabindex: 0 });
+    f.svg.appendChild(hit);
+    function on(evt) {
+      var box = f.svg.getBoundingClientRect();
+      var px = evt.clientX != null && evt.type !== "focus" ? (evt.clientX - box.left) * f.w / box.width : f.w - f.r;
+      var t = r0 + (r1 - r0) * (px - f.l) / (f.w - f.l - f.r), best = pts[0];
+      pts.forEach(function (x) { if (Math.abs(x.t - t) < Math.abs(best.t - t)) best = x; });
+      cross.setAttribute("x1", X(best.t)); cross.setAttribute("x2", X(best.t)); cross.setAttribute("visibility", "visible");
+      if (best.v != null) { dot.setAttribute("cx", X(best.t)); dot.setAttribute("cy", Y(best.v)); dot.setAttribute("visibility", "visible"); }
+      else dot.setAttribute("visibility", "hidden");
+      var rows = [{ value: best.v == null ? "keine Antwort" : best.v.toLocaleString("de-DE") + " ms", label: fine ? "Ping" : "Ø Ping (Stunde)", color: "var(--s1)" }];
+      if (best.max != null) rows.push({ value: best.max.toLocaleString("de-DE") + " ms", label: "Spitze" });
+      rows.push({ value: (best.loss || 0).toLocaleString("de-DE", { maximumFractionDigits: 1 }) + " %", label: "Paketverlust" });
+      showTip(evt, dt(best.t), rows);
+    }
+    function off() { cross.setAttribute("visibility", "hidden"); dot.setAttribute("visibility", "hidden"); hideTip(); }
+    hit.addEventListener("pointermove", on); hit.addEventListener("focus", on);
+    hit.addEventListener("pointerleave", off); hit.addEventListener("blur", off);
+    f.svg.setAttribute("aria-label", "Ping des Server-Macs ins Internet im Zeitraum");
+
+    var inRange = pts.filter(function (x) { return x.t >= r0; });
+    var ok = inRange.filter(function (x) { return x.v != null; });
+    var avg = ok.reduce(function (a, x) { return a + x.v; }, 0) / (ok.length || 1);
+    var loss = inRange.reduce(function (a, x) { return a + (x.loss || 0); }, 0) / (inRange.length || 1);
+    var net = state.status.network;
+    $("ping-summary").textContent = (ok.length ? "Ø " + avg.toLocaleString("de-DE", { maximumFractionDigits: 1 }) + " ms · " : "") +
+      "Paketverlust Ø " + loss.toLocaleString("de-DE", { maximumFractionDigits: 1 }) + " %" +
+      " · gemessen alle 2 Minuten" + (net ? " zu " + net.target : "") + ". Zeigt die Internetverbindung des Servers, nicht den Ping der Spieler.";
+    table($("tbl-ping"), ["Zeit", "Ø Ping", "Paketverlust"], inRange.slice().reverse().slice(0, 100).map(function (x) {
+      return [dt(x.t), x.v == null ? "–" : x.v.toLocaleString("de-DE") + " ms", (x.loss || 0).toLocaleString("de-DE", { maximumFractionDigits: 1 }) + " %"];
+    }), [false, true, true]);
+  }
+
   function table(node, head, rows, right) {
     clear(node);
     if (!rows.length) { node.appendChild(el("div", { class: "empty", text: "Keine Daten im Zeitraum." })); return; }
@@ -552,6 +638,7 @@
     renderOnline(r0, r1);
     renderPlaytime(r0, r1);
     renderUptime(r0, r1);
+    renderPing(r0, r1);
     renderPlayerStats(r0, r1);
     renderSessions(r0, r1);
     renderBackups();
