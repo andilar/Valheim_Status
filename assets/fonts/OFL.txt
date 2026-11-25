@@ -1,0 +1,4 @@
+Germania One and Rajdhani are licensed under the SIL Open Font License, Version 1.1
+(https://openfontlicense.org). Copyright notices and full license texts:
+https://fonts.google.com/specimen/Germania+One/license and https://fonts.google.com/specimen/Rajdhani/license
+These are the Latin subsets as served by Google Fonts, self-hosted so that visitors' browsers never contact Google.

@@ -164,7 +164,7 @@
 
   function renderHeader() {
     var st = state.status, s = st.server, ls = liveState();
-    $("srv-name").textContent = s.name;
+    $("srv-name").textContent = s.name.replace(/_/g, " ");
     $("srv-world").textContent = "Welt „" + s.world + "“" + (s.version ? " · Valheim " + s.version : "");
     var badge = $("state-badge"), m = STATES[ls] || STATES.unknown;
     badge.className = "badge " + m[0];
@@ -692,17 +692,19 @@
     });
   });
 
-  // theme toggle: auto -> light -> dark
+  // theme toggle: dark (default look) <-> light
   var theme = null;
   try { theme = localStorage.getItem("vs-theme"); } catch (e) { /* ignore */ }
   function applyTheme() {
-    if (theme === "light" || theme === "dark") document.documentElement.setAttribute("data-theme", theme);
+    if (theme === "light") document.documentElement.setAttribute("data-theme", "light");
     else document.documentElement.removeAttribute("data-theme");
-    $("theme-btn").title = "Farbschema: " + (theme === "light" ? "hell" : theme === "dark" ? "dunkel" : "automatisch");
+    $("theme-btn").textContent = theme === "light" ? "Dunkel" : "Hell";
+    $("theme-btn").setAttribute("aria-label", theme === "light" ? "Dunkles Farbschema" : "Helles Farbschema");
+    if (state.status) renderHistory();
   }
   applyTheme();
   $("theme-btn").addEventListener("click", function () {
-    theme = theme === "light" ? "dark" : theme === "dark" ? null : "light";
+    theme = theme === "light" ? null : "light";
     try { if (theme) localStorage.setItem("vs-theme", theme); else localStorage.removeItem("vs-theme"); } catch (e) { /* ignore */ }
     applyTheme();
   });

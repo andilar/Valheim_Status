@@ -5,21 +5,28 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Valheim Server Status</title>
 <meta name="description" content="Live-Status, Spieler und Weltfortschritt des Valheim-Servers Rethen_LAN_FTW">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3 5 9v7c0 6.5 4.6 11.4 11 13 6.4-1.6 11-6.5 11-13V9z' fill='%239a5b1e'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#080b0e">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3 5 9v7c0 6.5 4.6 11.4 11 13 6.4-1.6 11-6.5 11-13V9z' fill='%235fc6e6'/%3E%3C/svg%3E">
+<link rel="preload" href="assets/fonts/GermaniaOne-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/Rajdhani-500.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="assets/style.css">
+<script>try { if (localStorage.getItem("vs-theme") === "light") document.documentElement.setAttribute("data-theme", "light"); } catch (e) {}</script>
 </head>
 <body>
 <div class="wrap">
-  <header class="top">
-    <div class="title">
-      <h1 id="srv-name">Valheim Server</h1>
-      <div class="sub" id="srv-world">Lade Daten …</div>
-    </div>
+  <nav class="topbar" aria-label="Kopfzeile">
+    <div class="brand">Rethen <b>Status</b></div>
     <div class="meta">
       <span class="badge" id="state-badge"><span class="dot"></span><span>…</span></span>
       <span class="sub" id="updated"></span>
-      <button class="theme-btn" id="theme-btn" type="button" aria-label="Farbschema wechseln">◐</button>
+      <button class="theme-btn" id="theme-btn" type="button">Hell</button>
     </div>
+  </nav>
+
+  <header class="hero-head">
+    <div class="eyebrow" id="srv-world">Lade Daten …</div>
+    <h1><span id="srv-name">Valheim Server</span><span class="frost">Dashboard</span></h1>
+    <p class="lede">Wer ist online, wer spielt am meisten, wie weit ist die Welt</p>
   </header>
 
   <div class="banner hidden" id="banner" role="status"></div>
@@ -64,7 +71,7 @@
   </section>
 
   <section aria-labelledby="h-history">
-    <h2 id="h-history">Spieler &amp; Verlauf</h2>
+    <div class="section-title"><h2 id="h-history">Spieler &amp; Verlauf</h2></div>
     <div class="filters">
       <div class="seg" role="group" aria-label="Zeitraum" id="range">
         <button type="button" data-range="day">24 h</button>

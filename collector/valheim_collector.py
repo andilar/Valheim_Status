@@ -601,11 +601,23 @@ def server_process():
     if not pids:
         return None
     pid = pids[0]
+    info = {"pid": pid, "cpu": None, "mem_mb": None}
     try:
         out = subprocess.run(["ps", "-o", "%cpu=,rss=", "-p", str(pid)], capture_output=True, text=True, timeout=10).stdout.split()
-        return {"pid": pid, "cpu": float(out[0].replace(",", ".")), "mem_mb": round(int(out[1]) / 1024)}
+        info.update(cpu=float(out[0].replace(",", ".")), mem_mb=round(int(out[1]) / 1024))
     except Exception:
-        return {"pid": pid, "cpu": None, "mem_mb": None}
+        pass
+    try:
+        # RSS undercounts on macOS (idle memory gets compressed); top's MEM is the physical
+        # footprint, the same number Activity Monitor shows
+        out = subprocess.run(["/usr/bin/top", "-l", "1", "-pid", str(pid), "-stats", "pid,mem"],
+                             capture_output=True, text=True, timeout=15).stdout.splitlines()
+        m = re.match(r"\s*%d\s+([\d.]+)([KMGB])" % pid, out[-1])
+        if m:
+            info["mem_mb"] = round(float(m.group(1)) * {"B": 1 / 1048576, "K": 1 / 1024, "M": 1, "G": 1024}[m.group(2)])
+    except Exception:
+        pass
+    return info
 
 # ---------------------------------------------------------------- network
 
