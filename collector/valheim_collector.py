@@ -58,8 +58,9 @@ BOSSES = [  # progression order, official German names
     ("defeated_goblinking", "Yagluth", "Ebenen"),
     ("defeated_queen", "Die Königin", "Nebellande"),
     ("defeated_fader", "Fader", "Aschenlande"),
-    # global key not known yet: status is published as unknown (None) until it is mapped
-    (None, "Kall Fimbulbringer", "Hoher Norden"),
+    # exact global key not known yet (not defeated as of 2026-11-25): matched by pattern,
+    # so the first key containing "kall"/"fimbul" marks him defeated, dated from that save
+    ("re:kall|fimbul", "Kall Fimbulbringer", "Hoher Norden"),
 ]
 # Keys of newer content (e.g. defeated_writhan, elakingmole_defeated, jotun_killed) are not mapped:
 # their meaning is unverified, so they are published as raw "unknown keys" only.
@@ -77,7 +78,8 @@ MILESTONES = [
     ("ashlandsocean", "Ozean der Aschenlande erreicht"),
 ]
 IGNORED_KEYS = {"activebosses 0"}  # runtime state, not progress
-KNOWN_KEYS = {k for k, _, _ in BOSSES if k} | {k for k, _ in MILESTONES}
+KNOWN_KEYS = {k for k, _, _ in BOSSES if not k.startswith("re:")} | {k for k, _ in MILESTONES}
+KEY_PATTERNS = [re.compile(k[3:]) for k, _, _ in BOSSES if k.startswith("re:")]
 
 log = logging.getLogger("collector")
 
@@ -715,8 +717,14 @@ def export(con, outdir):
     current = set(meta_get(con, "current_keys", []))
 
     def key_info(k):
-        if k is None:
-            return {"defeated": None, "defeated_at": None}  # unknown key: status unknown
+        if k.startswith("re:"):
+            rx = re.compile(k[3:])
+            hits = sorted(((keys.get(x, (None, 1)), x) for x in current | set(keys) if rx.search(x)),
+                          key=lambda h: h[0][0] or 0)
+            if not hits:
+                return {"defeated": False, "defeated_at": None}
+            fs, initial = hits[0][0]
+            return {"defeated": True, "defeated_at": None if initial else fs}
         if k in current or k in keys:
             fs, initial = keys.get(k, (None, 1))
             return {"defeated": True, "defeated_at": None if initial else fs}
@@ -724,7 +732,8 @@ def export(con, outdir):
 
     bosses = [dict(key=k, name=n, biome=b, **key_info(k)) for k, n, b in BOSSES]
     milestones = [dict(key=k, name=n, **key_info(k)) for k, n in MILESTONES]
-    unknown = sorted(k for k in (current | set(keys)) if k not in KNOWN_KEYS and k not in IGNORED_KEYS)
+    unknown = sorted(k for k in (current | set(keys)) if k not in KNOWN_KEYS and k not in IGNORED_KEYS
+                     and not any(rx.search(k) for rx in KEY_PATTERNS))
     defeated = sum(1 for b in bosses if b["defeated"])
     tier = next((b["biome"] for b in bosses if not b["defeated"]), bosses[-1]["biome"])
 

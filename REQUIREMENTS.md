@@ -63,7 +63,7 @@ Source: **world save**, not the log. The log only says "sending global keys", wi
   | Yagluth | `defeated_goblinking` | Ebenen |
   | Die Königin | `defeated_queen` | Nebellande |
   | Fader | `defeated_fader` | Aschenlande |
-  | Kall Fimbulbringer | unknown (shown as "status unknown" until mapped) | Hoher Norden |
+  | Kall Fimbulbringer | not yet known (not defeated on 2026-11-25); any key matching `kall\|fimbul` counts | Hoher Norden |
 - Mini-bosses & milestones: Hildir quests (`hildir1-3`), troll/surtling/bat/serpent first kills, Ashlands ocean.
 - "World progress" bar: bosses defeated / total; current biome tier derived from it.
 - Keys of newer content (`defeated_writhan`, `elakingmole_defeated`, `jotun_killed`) are **not** bosses defeated
