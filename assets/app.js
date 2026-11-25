@@ -170,7 +170,7 @@
     badge.className = "badge " + m[0];
     badge.lastChild.textContent = m[1];
     $("updated").textContent = "Daten " + ago(st.generated_at);
-    $("updated").title = "Zuletzt vom Server-Mac aktualisiert: " + dt(st.generated_at);
+    $("updated").title = "Zuletzt von Malachor aktualisiert: " + dt(st.generated_at);
     document.title = (ls === "online" ? "● " : "") + s.name + " · Valheim";
 
     var banner = $("banner"), age = now() - st.generated_at;
@@ -180,7 +180,7 @@
       banner.textContent = "Neue Daten konnten nicht geladen werden (" + state.fetchError + "). Angezeigt wird der letzte Stand.";
     } else if (age > STALE_S) {
       banner.className = "banner" + (age > UNKNOWN_S ? " critical" : "");
-      banner.textContent = "Seit " + dur(age) + " keine neuen Daten vom Server-Mac. Der Mac ist vielleicht aus oder offline, der Status kann veraltet sein.";
+      banner.textContent = "Seit " + dur(age) + " keine neuen Daten von Malachor. Der Rechner ist vielleicht aus oder offline, der Status kann veraltet sein.";
     }
   }
 
@@ -236,7 +236,7 @@
         pingQuality(net.avg_ms, net.loss_pct) + " · zu " + net.target +
         (net.loss_pct ? " · " + Math.round(net.loss_pct) + " % Verlust" : "")));
     }
-    if (s.disk_free_bytes != null) tiles.appendChild(tile("Freier Speicher", gb(s.disk_free_bytes), "auf dem Server-Mac"));
+    if (s.disk_free_bytes != null) tiles.appendChild(tile("Freier Speicher", gb(s.disk_free_bytes), "auf Malachor"));
     if (st.last_backup) tiles.appendChild(tile("Letztes Backup", ago(st.last_backup.at), dt(st.last_backup.at)));
   }
 
@@ -569,7 +569,7 @@
     function off() { cross.setAttribute("visibility", "hidden"); dot.setAttribute("visibility", "hidden"); hideTip(); }
     hit.addEventListener("pointermove", on); hit.addEventListener("focus", on);
     hit.addEventListener("pointerleave", off); hit.addEventListener("blur", off);
-    f.svg.setAttribute("aria-label", "Ping des Server-Macs ins Internet im Zeitraum");
+    f.svg.setAttribute("aria-label", "Ping von Malachor ins Internet im Zeitraum");
 
     var inRange = pts.filter(function (x) { return x.t >= r0; });
     var ok = inRange.filter(function (x) { return x.v != null; });
@@ -578,7 +578,7 @@
     var net = state.status.network;
     $("ping-summary").textContent = (ok.length ? "Ø " + avg.toLocaleString("de-DE", { maximumFractionDigits: 1 }) + " ms · " : "") +
       "Paketverlust Ø " + loss.toLocaleString("de-DE", { maximumFractionDigits: 1 }) + " %" +
-      " · gemessen alle 2 Minuten" + (net ? " zu " + net.target : "") + ". Zeigt die Internetverbindung des Servers, nicht den Ping der Spieler.";
+      " · gemessen alle 2 Minuten" + (net ? " zu " + net.target : "") + ". Zeigt die Internetverbindung von Malachor, nicht den Ping der Spieler.";
     table($("tbl-ping"), ["Zeit", "Ø Ping", "Paketverlust"], inRange.slice().reverse().slice(0, 100).map(function (x) {
       return [dt(x.t), x.v == null ? "–" : x.v.toLocaleString("de-DE") + " ms", (x.loss || 0).toLocaleString("de-DE", { maximumFractionDigits: 1 }) + " %"];
     }), [false, true, true]);
