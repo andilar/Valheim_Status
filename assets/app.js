@@ -223,7 +223,8 @@
       tiles.appendChild(tile("Join-Code", "–", "Nur wenn der Server läuft"));
     }
 
-    if (st.world.day != null) tiles.appendChild(tile("Ingame-Tag", "Tag " + st.world.day.toLocaleString("de-DE"), "Stand letzter Save"));
+    if (st.world.day != null) tiles.appendChild(tile("Ingame-Tag", "Tag " + st.world.day.toLocaleString("de-DE"),
+      "Stand " + (st.world.day_at ? ago(st.world.day_at) : "letzter Save")));
     if (st.last_save) tiles.appendChild(tile("Letzter Save", ago(st.last_save.at),
       "Nr. " + (st.last_save.number || "?") + " · " + st.last_save.duration_ms + " ms"));
     if (live && s.cpu != null) tiles.appendChild(tile("Server-Last", s.cpu.toLocaleString("de-DE", { maximumFractionDigits: 0 }) + " % CPU",
@@ -256,7 +257,7 @@
       ms.appendChild(el("span", { class: "chip " + (m.defeated ? "done" : "todo"), text: (m.defeated ? "✓ " : "○ ") + m.name }));
     });
     var uk = clear($("unknown"));
-    p.unknown_keys.forEach(function (k) { uk.appendChild(el("span", { class: "chip done", text: "✓ " + k })); });
+    p.unknown_keys.forEach(function (k) { uk.appendChild(el("span", { class: "chip", text: k })); });
     $("unknown-wrap").classList.toggle("hidden", !p.unknown_keys.length);
     var notes = [];
     if (p.bosses.some(function (b) { return b.defeated && !b.defeated_at; }))

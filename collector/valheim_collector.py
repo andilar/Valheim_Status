@@ -54,12 +54,8 @@ BOSSES = [  # progression order
     ("defeated_queen", "Die Königin", "Nebellande"),
     ("defeated_fader", "Fader", "Aschlande"),
 ]
-# Keys seen in this world that belong to newer content; names/biomes unverified.
-NEW_BOSSES = [
-    ("defeated_writhan", "Writhan", "Tiefer Norden"),
-    ("elakingmole_defeated", "Elaking Mole", "Tiefer Norden"),
-    ("jotun_killed", "Jotun", "Tiefer Norden"),
-]
+# Keys of newer content (e.g. defeated_writhan, elakingmole_defeated, jotun_killed) are not mapped:
+# their meaning is unverified, so they are published as raw "unknown keys" only.
 MILESTONES = [
     ("killedtroll", "Erster Troll getötet"),
     ("killed_surtling", "Erster Surtling getötet"),
@@ -74,7 +70,7 @@ MILESTONES = [
     ("ashlandsocean", "Ozean der Aschlande erreicht"),
 ]
 IGNORED_KEYS = {"activebosses 0"}  # runtime state, not progress
-KNOWN_KEYS = {k for k, _, _ in BOSSES + NEW_BOSSES} | {k for k, _ in MILESTONES}
+KNOWN_KEYS = {k for k, _, _ in BOSSES} | {k for k, _ in MILESTONES}
 
 log = logging.getLogger("collector")
 
@@ -95,7 +91,7 @@ PATTERNS = [  # (kind, regex) applied to the message part of a timestamped line
     ("conn", re.compile(r"^\s*Connections (\d+) ZDOS:")),  # periodic peer count
     ("savenum", re.compile(r"^World save \(1/5\).*Save number (\d+)")),
     ("savedone", re.compile(r"^World save \(5/5\) done\. Total time \[(\d+)ms\]")),
-    ("worldtime", re.compile(r"^Considering autobackup for World\. World time: ([\d.,]+?), short")),
+    ("day", re.compile(r"^Time [\d.,]+, day:(\d+)")),  # logged when players sleep
     ("joincode", re.compile(r"^Created new join code (\d+)")),
     ("joincode", re.compile(r"^Session \".*\" registered with join code (\d+)")),
     ("joincode", re.compile(r"^Session \".*\" with join code (\d+) and IP .* is active")),
@@ -133,8 +129,6 @@ def parse_line(line):
                     if x == "0" and y == "0":
                         return parse_ts(m), "death", name, None
                     return parse_ts(m), "char", name, None
-                if kind == "worldtime":
-                    return parse_ts(m), kind, g[0].replace(",", "."), None
                 return parse_ts(m), kind, (g[0] if g else None), None
         return parse_ts(m), None, None, None  # timestamp only (keeps last_ts fresh)
     m = MARK_RE.match(line.strip())
@@ -207,6 +201,7 @@ def ingest_file(con, path):
         return 0
     data = data[: end + 1]
     occ_cache = {}  # line_no below is the byte offset: monotonic within a file
+    prev_last_ts = last_ts
     n = 0
     first_ts = None
     pos = offset
@@ -225,7 +220,10 @@ def ingest_file(con, path):
         h = hashlib.sha1(line.encode()).hexdigest()[:16]
         key = (ts, h)
         if key not in occ_cache:
-            occ_cache[key] = con.execute("SELECT COUNT(*) FROM events WHERE file_id=? AND ts=? AND h=?", (fid, ts, h)).fetchone()[0]
+            # identical lines in the same second are numbered; only a chunk boundary inside
+            # that second can have earlier copies already stored for this file
+            occ_cache[key] = con.execute("SELECT COUNT(*) FROM events WHERE file_id=? AND ts=? AND h=?",
+                                         (fid, ts, h)).fetchone()[0] if offset and ts == prev_last_ts else 0
         occ = occ_cache[key]
         occ_cache[key] += 1
         cur = con.execute(
@@ -237,7 +235,15 @@ def ingest_file(con, path):
     return n
 
 
+SCHEMA_VERSION = 2
+
+
 def ingest_logs(con):
+    if meta_get(con, "schema_version", 1) < SCHEMA_VERSION:
+        # new line patterns: re-read every file once (duplicates are ignored by the unique key)
+        con.execute("UPDATE files SET offset=0")
+        con.execute("DELETE FROM events WHERE kind='worldtime'")  # was server uptime, not world time
+        meta_set(con, "schema_version", SCHEMA_VERSION)
     total = 0
     for path in log_files():
         try:
@@ -526,11 +532,16 @@ def read_world(con):
         status.update(ok=False, error="no complete save found")
         return status
     num, path = found
-    if status.get("save_number") == num and status.get("ok"):
+    if status.get("save_number") == num and status.get("ok") and "net_time" in status:
         return status
     try:
         with open(path, "rb") as f:
             data = f.read()
+        net_time = None
+        if len(data) >= 12:
+            ver, t = struct.unpack_from("<id", data, 0)
+            if 0 < ver < 1000 and 0 <= t < 1e10:
+                net_time = t
         gz = data.find(b"\x1f\x8b", 0, 64)
         if gz < 0:
             raise ValueError("no gzip stream")
@@ -551,7 +562,8 @@ def read_world(con):
                     (k, now, 1 if first_read else 0, num))
     meta_set(con, "world_read_once", True)
     meta_set(con, "current_keys", sorted(k for k in keys if k not in IGNORED_KEYS))
-    status = {"ok": True, "save_number": num, "at": now, "mtime": int(os.path.getmtime(path))}
+    status = {"ok": True, "save_number": num, "at": now, "mtime": int(os.path.getmtime(path)),
+              "net_time": net_time}
     meta_set(con, "world_status", status)
     con.commit()
     return status
@@ -616,25 +628,25 @@ def export(con, outdir):
     except OSError:
         server["disk_free_bytes"] = None
 
-    # last save / world time across all runs
+    # last save across all runs
     last_save = None
-    world_time = None
     for r in reversed(runs):
-        if last_save is None:
-            ts, ms = last_event(r, "savedone")
-            if ts:
-                _, num = last_event(r, "savenum")
-                last_save = {"at": ts, "duration_ms": int(ms), "number": int(num) if num else None}
-        if world_time is None:
-            ts, wt = last_event(r, "worldtime")
-            if ts:
-                world_time = {"at": ts, "seconds": float(wt)}
-        if last_save and world_time:
+        ts, ms = last_event(r, "savedone")
+        if ts:
+            _, num = last_event(r, "savenum")
+            last_save = {"at": ts, "duration_ms": int(ms), "number": int(num) if num else None}
             break
-    day = None
-    if world_time:
-        day = int(world_time["seconds"] // DAY_SECONDS)  # as of the last save
-
+    # in-game day: world clock from the save header (the log's "World time" is only the
+    # server's uptime); fall back to the day printed when players last slept
+    day, day_at = None, None
+    if world.get("net_time") is not None:
+        day, day_at = int(world["net_time"] // DAY_SECONDS), world.get("mtime")
+    else:
+        for r in reversed(runs):
+            ts, d = last_event(r, "day")
+            if ts:
+                day, day_at = int(d), ts
+                break
     keys = {r[0]: (r[1], r[2]) for r in con.execute("SELECT key, first_seen, initial FROM world_keys")}
     current = set(meta_get(con, "current_keys", []))
 
@@ -645,8 +657,6 @@ def export(con, outdir):
         return {"defeated": False, "defeated_at": None}
 
     bosses = [dict(key=k, name=n, biome=b, **key_info(k)) for k, n, b in BOSSES]
-    new_bosses = [dict(key=k, name=n, biome=b, unverified=True, **key_info(k)) for k, n, b in NEW_BOSSES]
-    new_bosses = [b for b in new_bosses if b["defeated"]]
     milestones = [dict(key=k, name=n, **key_info(k)) for k, n in MILESTONES]
     unknown = sorted(k for k in (current | set(keys)) if k not in KNOWN_KEYS and k not in IGNORED_KEYS)
     defeated = sum(1 for b in bosses if b["defeated"])
@@ -657,12 +667,12 @@ def export(con, outdir):
     status = {
         "schema": 1, "generated_at": now, "collector_version": VERSION, "interval_s": CFG["interval"],
         "server": server, "last_save": last_save,
-        "world": {"day": day, "world_time_s": world_time["seconds"] if world_time else None,
+        "world": {"day": day, "day_at": day_at,
                   "save_ok": world.get("ok", False), "save_error": None if world.get("ok") else world.get("error"),
                   "save_read_at": world.get("at")},
         "players_online": online,
         "progress": {"defeated": defeated, "total": len(BOSSES), "current_tier": tier,
-                     "bosses": bosses, "new_bosses": new_bosses, "milestones": milestones,
+                     "bosses": bosses, "new_bosses": [], "milestones": milestones,
                      "unknown_keys": unknown},
         "last_backup": (backups() or [None])[0],
     }
