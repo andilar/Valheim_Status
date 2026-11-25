@@ -619,15 +619,6 @@
       }), [false, true, true, true, true, true, false, false]);
   }
 
-  function renderSessions(r0, r1) {
-    var list = sessions().filter(function (s) { return overlap(s.start, sessEnd(s), r0, r1) > 0; }).slice().reverse().slice(0, 25);
-    table($("sessions"), ["Spieler", "Beginn", "Ende", "Dauer"], list.map(function (s) {
-      var d = el("span", null, dur(sessEnd(s) - s.start, true));
-      if (s.uncertain) d.insertBefore(el("span", { class: "flag", title: "Geschätzt: Das Log sagt nicht genau, wann dieser Spieler gegangen ist.", text: "≈ " }), d.firstChild);
-      return [s.player, dt(s.start), s.end == null ? "online" : fmtHM.format(new Date(s.end * 1000)), d];
-    }), [false, false, false, true]);
-  }
-
   function renderBackups() {
     var b = (state.history.backups || []).slice(0, 10);
     table($("backups"), ["Zeitpunkt", "", "Art"], b.map(function (x) { return [dt(x.at), ago(x.at), x.auto ? "automatisch" : "manuell"]; }), [false, false, false]);
@@ -643,7 +634,6 @@
     renderUptime(r0, r1);
     renderPing(r0, r1);
     renderPlayerStats(r0, r1);
-    renderSessions(r0, r1);
     renderBackups();
   }
 
