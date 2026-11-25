@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.andilar.valheim-collector</string>
+  <key>UserName</key><string>andilar</string>
+  <key>GroupName</key><string>staff</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/python3</string>
+    <string>/Users/andilar/ValheimServer/valheim_collector.py</string>
+    <string>run</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key><string>/Users/andilar</string>
+    <key>PATH</key><string>/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>WorkingDirectory</key><string>/Users/andilar</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>60</integer>
+  <key>ProcessType</key><string>Background</string>
+  <key>Nice</key><integer>10</integer>
+  <key>LowPriorityIO</key><true/>
+  <key>StandardOutPath</key><string>/Users/andilar/Library/Logs/ValheimServer/collector.launchd.log</string>
+  <key>StandardErrorPath</key><string>/Users/andilar/Library/Logs/ValheimServer/collector.launchd.log</string>
+</dict>
+</plist>

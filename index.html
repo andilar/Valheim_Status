@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Valheim Server Status</title>
+<meta name="description" content="Live-Status, Spieler und Weltfortschritt des Valheim-Servers Rethen_LAN_FTW">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3 5 9v7c0 6.5 4.6 11.4 11 13 6.4-1.6 11-6.5 11-13V9z' fill='%239a5b1e'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="title">
+      <h1 id="srv-name">Valheim Server</h1>
+      <div class="sub" id="srv-world">Lade Daten …</div>
+    </div>
+    <div class="meta">
+      <span class="badge" id="state-badge"><span class="dot"></span><span>…</span></span>
+      <span class="sub" id="updated"></span>
+      <button class="theme-btn" id="theme-btn" type="button" aria-label="Farbschema wechseln">◐</button>
+    </div>
+  </header>
+
+  <div class="banner hidden" id="banner" role="status"></div>
+
+  <div class="grid tiles" id="tiles"></div>
+
+  <section aria-labelledby="h-progress">
+    <div class="card">
+      <div class="progress-head">
+        <h2 id="h-progress">Weltfortschritt</h2>
+        <span class="sub" id="progress-text"></span>
+      </div>
+      <div class="bar-track" role="progressbar" id="progress-bar" aria-valuemin="0"><div class="bar-fill" id="progress-fill" style="width:0"></div></div>
+      <div class="grid bosses" id="bosses"></div>
+      <div id="new-bosses-wrap" class="hidden">
+        <h3 style="margin-top:16px">Neuere Bosse</h3>
+        <div class="grid bosses" id="new-bosses"></div>
+      </div>
+      <h3 style="margin-top:16px">Meilensteine</h3>
+      <div class="chips" id="milestones"></div>
+      <div id="unknown-wrap" class="hidden">
+        <h3 style="margin-top:16px">Weitere Welt-Schlüssel</h3>
+        <div class="chips" id="unknown"></div>
+      </div>
+      <p class="sub" id="progress-note" style="margin:12px 0 0"></p>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-history">
+    <h2 id="h-history">Spieler &amp; Verlauf</h2>
+    <div class="filters">
+      <div class="seg" role="group" aria-label="Zeitraum" id="range">
+        <button type="button" data-range="day">24 h</button>
+        <button type="button" data-range="week">Diese Woche</button>
+        <button type="button" data-range="month">Dieser Monat</button>
+        <button type="button" data-range="all" aria-pressed="true">Gesamt</button>
+      </div>
+      <span class="sub" id="range-text"></span>
+    </div>
+
+    <div class="grid two">
+      <div class="card">
+        <h3>Meiste Spielzeit</h3>
+        <div class="lb" id="leaderboard"></div>
+      </div>
+      <div class="card">
+        <h3>Spieler online</h3>
+        <div class="chart" id="chart-online"></div>
+        <details class="tbl"><summary>Als Tabelle</summary><div class="scroll" id="tbl-online"></div></details>
+      </div>
+      <div class="card">
+        <h3 id="h-playtime">Spielzeit pro Woche</h3>
+        <div class="legend" id="legend-playtime"></div>
+        <div class="chart" id="chart-playtime"></div>
+        <details class="tbl"><summary>Als Tabelle</summary><div class="scroll" id="tbl-playtime"></div></details>
+      </div>
+      <div class="card">
+        <h3>Server-Laufzeit</h3>
+        <div class="legend" id="legend-uptime"></div>
+        <div class="chart" id="chart-uptime"></div>
+        <div class="sub" id="uptime-summary" style="margin-top:6px"></div>
+        <details class="tbl"><summary>Als Tabelle</summary><div class="scroll" id="tbl-uptime"></div></details>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <h3>Spieler-Statistik</h3>
+      <div class="scroll" id="player-stats"></div>
+    </div>
+
+    <div class="grid two" style="margin-top:12px">
+      <div class="card">
+        <h3>Sessions</h3>
+        <div class="scroll" id="sessions"></div>
+      </div>
+      <div class="card">
+        <h3>Backups</h3>
+        <div class="scroll" id="backups"></div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p id="foot-note">Die Daten kommen vom Server-Mac und sind bis zu ca. 5 Minuten alt. Die Seite lädt jede Minute neu.
+      Sessions mit <span class="flag">≈</span> sind geschätzt: Bei einem normalen Logout steht im Server-Log nicht, wer gegangen ist.</p>
+    <p><a href="https://github.com/andilar/Valheim_Status">Quellcode auf GitHub</a></p>
+  </footer>
+</div>
+<div class="tip hidden" id="tip" role="tooltip"></div>
+<script src="assets/app.js"></script>
+</body>
+</html>
