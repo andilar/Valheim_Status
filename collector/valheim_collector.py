@@ -48,6 +48,7 @@ CFG = {
     "git_email": "2079761+andilar@users.noreply.github.com",
 }
 
+RECONNECT_GRACE = 120  # s; reconnects in the logs happen within ~30 s
 DAY_SECONDS = 1800  # one in-game day
 DAY_START = 0.15    # a new day begins in the morning, not at midnight (matches the game's own
                     # "day:N" log lines 51/51; plain t/1800 is one day ahead at night)
@@ -452,7 +453,13 @@ def build_sessions(run, live):
                 # counts on "connection lost" lines still include kept sockets
                 reconcile(n, ts, False)
 
-    if not live:
+    if live:
+        # a dropped connection that has not reconnected within 2 min has left; the server only
+        # reports it with the next 10-minute connection count, so don't keep showing them online
+        for s in list(open_.values()):
+            if s.dropped and time.time() - s.dropped > RECONNECT_GRACE:
+                close(s, s.dropped, "timeout", False)
+    else:
         for s in list(open_.values()):
             close(s, run["end"], "server_stop", False)
     return sessions, deaths
