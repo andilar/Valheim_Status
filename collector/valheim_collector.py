@@ -64,8 +64,7 @@ BOSSES = [  # progression order, official German names
     # so the first key containing "kall"/"fimbul" marks him defeated, dated from that save
     ("re:kall|fimbul", "Kall Fimbulbringer", "Hoher Norden"),
 ]
-# Keys of newer content (e.g. defeated_writhan, elakingmole_defeated, jotun_killed) are not mapped:
-# their meaning is unverified, so they are published as raw "unknown keys" only.
+# Keys not listed here are published as raw "unknown keys" (e.g. after a game update).
 MILESTONES = [
     ("killedtroll", "Erster Troll getötet"),
     ("killed_surtling", "Erster Surtling getötet"),
@@ -78,6 +77,10 @@ MILESTONES = [
     ("hildir2", "Hildir-Quest 2 abgegeben"),
     ("hildir3", "Hildir-Quest 3 abgegeben"),
     ("ashlandsocean", "Ozean der Aschenlande erreicht"),
+    # 1.0 keys (official German names from the game's localization):
+    ("defeated_writhan", "Erster Writhan getötet"),               # Sumpfland creature
+    ("elakingmole_defeated", "Erster Augenloser getötet"),        # ElakingMole = Augenloser; enables the Elaking raid
+    ("jotun_killed", "Erster Krigen oder Hexen getötet"),         # Jötnar; enables the raid "Die Jötnar haben dich gefunden"
 ]
 IGNORED_KEYS = {"activebosses 0"}  # runtime state, not progress
 KNOWN_KEYS = {k for k, _, _ in BOSSES if not k.startswith("re:")} | {k for k, _ in MILESTONES}

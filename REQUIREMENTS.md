@@ -66,8 +66,9 @@ Source: **world save**, not the log. The log only says "sending global keys", wi
   | Kall Fimbulbringer | not yet known (not defeated on 2026-11-25); any key matching `kall\|fimbul` counts | Hoher Norden |
 - Mini-bosses & milestones: Hildir quests (`hildir1-3`), troll/surtling/bat/serpent first kills, Ashlands ocean.
 - "World progress" bar: bosses defeated / total; current biome tier derived from it.
-- Keys of newer content (`defeated_writhan`, `elakingmole_defeated`, `jotun_killed`) are **not** bosses defeated
-  as named; meaning unverified, so they are shown only as raw keys until mapped by the owner.
+- 1.0 keys `defeated_writhan` (first Writhan, Sumpfland), `elakingmole_defeated` (first Augenloser / Eyeless One,
+  enables the Elaking raid) and `jotun_killed` (first Krigen or Hexen, enables the Jötnar raid) are first-kill
+  milestones, not bosses (Valheim Wiki "Global Keys", valheimdb raid list, game localization).
 - In-game day: world clock (`netTime`, float64 seconds) from the save header (int32 version, float64 netTime,
   before the gzip stream): day = floor((netTime − 0.15 × 1800) / 1800), because a day starts in the
   morning (verified against all 51 `day:N` log lines). Fallback: the `Time …, day:N` line logged when players sleep.
