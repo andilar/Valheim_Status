@@ -47,6 +47,37 @@ Server: `Rethen_LAN_FTW`, world `eleventh heaven`, macOS 12 Mac running as launc
 - One-time import of all existing logs (session logs + `archive/`), deduplicated
 - Survives collector and server restarts without double-counting
 
+### F5 Boss overview & world progress
+Source: **world save**, not the log. The log only says "sending global keys", without names.
+`~/Library/Application Support/IronGate/Valheim/worlds_local/eleventh heaven/_main.<N>.db2`
+(16-byte header, then gzip). It contains the world's *global keys* list
+(length-prefixed strings, preceded by an int32 count).
+
+- Boss cards in progression order, defeated / not defeated:
+  | Boss | Key | Biome |
+  |------|-----|-------|
+  | Eikthyr | `defeated_eikthyr` | Meadows |
+  | The Elder | `defeated_gdking` | Black Forest |
+  | Bonemass | `defeated_bonemass` | Swamp |
+  | Moder | `defeated_dragon` | Mountains |
+  | Yagluth | `defeated_goblinking` | Plains |
+  | The Queen | `defeated_queen` | Mistlands |
+  | Fader | `defeated_fader` | Ashlands |
+  | Newer bosses | `defeated_writhan`, `elakingmole_defeated`, `jotun_killed` (verify names, biome) | Deep North |
+- Mini-bosses & milestones: Hildir quests (`hildir1-3`), troll/surtling/bat/serpent first kills, Ashlands ocean.
+- "World progress" bar: bosses defeated / total; current biome tier derived from it.
+- In-game day: `World time` (seconds) from the log's save lines ÷ 1800 s per day, shown as "Day 653".
+- Date a boss was defeated: no timestamp in the save. The collector records the date a key first appears
+  (accurate from now on; existing kills are shown as "defeated, date unknown").
+- Unknown keys (new game updates or mods) are shown with their raw name instead of being dropped.
+- Read the newest complete save only (the one with a matching `.ok` file); read-only, never lock or write the save.
+- Parser is heuristic (no official format spec); must fail safe: on parse error keep last known state and flag it.
+
+**Not available server-side:** player skill levels, inventory and character level are stored on each
+player's own PC, not on the server.
+
+**Never published from the save:** Steam IDs, PlayFab IDs and account names listed in the `.fwl2` file.
+
 ## Non-functional requirements
 
 ### N1 Architecture & security (public site)
@@ -70,7 +101,7 @@ Server: `Rethen_LAN_FTW`, world `eleventh heaven`, macOS 12 Mac running as launc
 - Auto-refresh every 60 s; data is up to ~5 min old (push interval + GitHub caching), shown on the page
 
 ## Out of scope (v1)
-- In-game chat, player positions/map, boss progress (need mods or world-save parsing)
+- In-game chat, player positions/map (need mods); player skills (stored on clients)
 - Server controls and settings editing (planned v2)
 
 ## Resolved
