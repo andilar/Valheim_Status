@@ -682,6 +682,62 @@ def ping_export(con, now):
 # ---------------------------------------------------------------- export
 
 
+def local_midnight(ts):
+    t = time.localtime(ts)
+    return int(time.mktime((t.tm_year, t.tm_mon, t.tm_mday, 0, 0, 0, 0, 0, -1)))
+
+
+def next_midnight(ts):
+    t = time.localtime(ts)
+    return int(time.mktime((t.tm_year, t.tm_mon, t.tm_mday + 1, 0, 0, 0, 0, 0, -1)))
+
+
+def aggregate(sessions, deaths, now):
+    """Privacy: publish only sums, never individual login/logout times.
+
+    players_daily: [day (local midnight), player, seconds played, sessions started, longest session
+                    started that day (s), deaths]
+    online_hourly: [hour, max players online at the same time] (no names), hours with nobody omitted
+    """
+    daily = {}
+
+    def row(day, player):
+        return daily.setdefault((day, player), [day, player, 0, 0, 0, 0])
+
+    for s in sessions:
+        if not s.start:
+            continue
+        end = s.end if s.end is not None else now
+        r = row(local_midnight(s.start), s.name)
+        r[3] += 1
+        r[4] = max(r[4], int(end - s.start))
+        t = s.start
+        while t < end:  # split across midnights
+            nm = min(next_midnight(t), end)
+            row(local_midnight(t), s.name)[2] += int(nm - t)
+            t = nm
+    for name, ts in deaths:
+        row(local_midnight(ts), name)[5] += 1
+
+    edges = []
+    for s in sessions:
+        if s.start:
+            edges.append((s.start, 1))
+            edges.append((s.end if s.end is not None else now, -1))
+    edges.sort()
+    hourly, count = {}, 0
+    for i, (t, d) in enumerate(edges):
+        count += d
+        nxt = edges[i + 1][0] if i + 1 < len(edges) else t
+        if count > 0 and nxt > t:
+            h = t - t % 3600
+            while h < nxt:
+                hourly[h] = max(hourly.get(h, 0), count)
+                h += 3600
+    return (sorted(daily.values(), key=lambda r: (r[0], r[1])),
+            sorted([h, c] for h, c in hourly.items()))
+
+
 def last_event(run, kind):
     for ts, k, a in reversed(run["events"]):
         if k == kind:
@@ -771,11 +827,11 @@ def export(con, outdir):
                      "unknown_keys": unknown},
         "last_backup": (backups() or [None])[0],
     }
+    players_daily, online_hourly = aggregate(sessions, deaths, now)
     history = {
-        "schema": 1, "generated_at": now,
-        "sessions": [{"player": s.name, "start": s.start, "end": s.end,
-                      "uncertain": s.uncertain} for s in sorted(sessions, key=lambda s: s.start) if s.start],
-        "deaths": [{"player": n, "at": t} for n, t in sorted(deaths, key=lambda d: d[1])],
+        "schema": 2, "generated_at": now,
+        "players_daily": players_daily,
+        "online_hourly": online_hourly,
         "runs": runs_out,
         "backups": backups()[:50],
         "ping": ping_hist,

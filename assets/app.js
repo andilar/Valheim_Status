@@ -109,13 +109,22 @@
   document.addEventListener("scroll", hideTip, { passive: true });
 
   // ---------------------------------------------------------------- data shaping
-  function sessions() { return (state.history && state.history.sessions) || []; }
-  function sessEnd(s) { return s.end == null ? now() : s.end; }
+  // history.json holds only sums (privacy): per player and day, and players online per hour
+  function daily() {
+    return ((state.history && state.history.players_daily) || []).map(function (r) {
+      return { day: r[0], player: r[1], secs: r[2], sessions: r[3], longest: r[4], deaths: r[5] };
+    });
+  }
+  function hourly() { return (state.history && state.history.online_hourly) || []; }
 
   function assignColors() {
-    // colour follows the player (order of first appearance), never their rank
-    var order = [];
-    sessions().forEach(function (s) { if (order.indexOf(s.player) < 0) order.push(s.player); });
+    // colour follows the player, never their rank: order by first day seen, then all-time playtime
+    var first = {}, total = {};
+    daily().forEach(function (r) {
+      if (!(r.player in first) || r.day < first[r.player]) first[r.player] = r.day;
+      total[r.player] = (total[r.player] || 0) + r.secs;
+    });
+    var order = Object.keys(first).sort(function (a, b) { return first[a] - first[b] || total[b] - total[a] || (a < b ? -1 : 1); });
     colorOf = {};
     order.forEach(function (p, i) { colorOf[p] = i < SLOTS ? "var(--s" + (i + 1) + ")" : "var(--ink-2)"; });
   }
@@ -124,27 +133,20 @@
   function rangeBounds() {
     var t = now(), r = state.range;
     var first = t;
-    sessions().forEach(function (s) { if (s.start < first) first = s.start; });
+    daily().forEach(function (x) { if (x.day < first) first = x.day; });
     ((state.history && state.history.runs) || []).forEach(function (x) { if (x.start < first) first = x.start; });
-    if (r === "day") return [t - 86400, t];
+    if (r === "day") return [startOfDay(t), t];
     if (r === "week") return [startOfWeek(t), t];
     if (r === "month") return [startOfMonth(t), t];
-    return [Math.min(first, t - 3600), t];
+    return [Math.min(startOfDay(first), t - 3600), t];
   }
-  function overlap(a0, a1, b0, b1) { return Math.max(0, Math.min(a1, b1) - Math.max(a0, b0)); }
 
   function playerTotals(r0, r1) {
     var m = {};
-    sessions().forEach(function (s) {
-      var o = overlap(s.start, sessEnd(s), r0, r1);
-      if (o <= 0) return;
-      var p = m[s.player] || (m[s.player] = { player: s.player, total: 0, sessions: 0, longest: 0, deaths: 0 });
-      p.total += o; p.sessions += 1; p.longest = Math.max(p.longest, sessEnd(s) - s.start);
-    });
-    ((state.history && state.history.deaths) || []).forEach(function (d) {
-      if (d.at < r0 || d.at > r1) return;
-      var p = m[d.player] || (m[d.player] = { player: d.player, total: 0, sessions: 0, longest: 0, deaths: 0 });
-      p.deaths += 1;
+    daily().forEach(function (r) {
+      if (r.day < startOfDay(r0) || r.day >= r1) return;
+      var p = m[r.player] || (m[r.player] = { player: r.player, total: 0, sessions: 0, longest: 0, deaths: 0 });
+      p.total += r.secs; p.sessions += r.sessions; p.longest = Math.max(p.longest, r.longest); p.deaths += r.deaths;
     });
     return Object.keys(m).map(function (k) { return m[k]; }).sort(function (a, b) { return b.total - a.total; });
   }
@@ -331,26 +333,21 @@
 
   function renderOnline(r0, r1) {
     var node = $("chart-online"), f = chartFrame(node, 190);
-    // step function: player count over time
-    var ev = [];
-    sessions().forEach(function (s) {
-      var a = Math.max(s.start, r0), b = Math.min(sessEnd(s), r1);
-      if (b > a) { ev.push([a, 1]); ev.push([b, -1]); }
-    });
-    ev.sort(function (x, y) { return x[0] - y[0] || x[1] - y[1]; });
-    var pts = [[r0, 0]], c = 0;
-    ev.forEach(function (e) { c += e[1]; pts.push([e[0], c]); });
-    pts.push([r1, c]);
+    // most players online at the same time, per hour (no names: privacy)
+    var byHour = {};
+    hourly().forEach(function (x) { byHour[x[0]] = x[1]; });
+    var pts = [], h0 = Math.floor(r0 / 3600) * 3600;
+    for (var h = h0; h < r1; h += 3600) pts.push([h, byHour[h] || 0]);
     var max = Math.max(2, pts.reduce(function (m, p) { return Math.max(m, p[1]); }, 0));
-    f.svg.setAttribute("aria-label", "Spieler online im gewählten Zeitraum, höchstens " + max + " gleichzeitig");
+    f.svg.setAttribute("aria-label", "Spieler online pro Stunde im gewählten Zeitraum, höchstens " + max + " gleichzeitig");
     yAxis(f, max, max <= 4 ? max : 4);
-    var X = function (t) { return f.l + (f.w - f.l - f.r) * (t - r0) / (r1 - r0); };
+    var X = function (t) { return f.l + (f.w - f.l - f.r) * (Math.max(r0, Math.min(r1, t)) - r0) / (r1 - r0); };
     var Y = function (v) { return f.h - f.b - (f.h - f.t - f.b) * v / max; };
     niceTicks(r0, r1, f.w - f.l).forEach(function (tk) {
       f.svg.appendChild(sv("text", { x: X(tk.t), y: f.h - 6, "text-anchor": "middle", text: tk.label }));
     });
-    var d = "M" + X(pts[0][0]) + "," + Y(0), prev = 0;
-    pts.forEach(function (p) { d += "L" + X(p[0]) + "," + Y(prev) + "L" + X(p[0]) + "," + Y(p[1]); prev = p[1]; });
+    var d = "M" + X(r0) + "," + Y(0);
+    pts.forEach(function (p) { d += "L" + X(p[0]) + "," + Y(p[1]) + "L" + X(p[0] + 3600) + "," + Y(p[1]); });
     f.svg.appendChild(sv("path", { d: d + "L" + X(r1) + "," + Y(0) + "Z", fill: "var(--s1)", "fill-opacity": 0.12, stroke: "none" }));
     f.svg.appendChild(sv("path", { d: d, fill: "none", stroke: "var(--s1)", "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
 
@@ -360,22 +357,19 @@
     f.svg.appendChild(hit);
     function at(evt) {
       var box = f.svg.getBoundingClientRect();
-      var px = evt.clientX != null && evt.type !== "focus" ? (evt.clientX - box.left) * f.w / box.width : f.w - f.r;
-      var t = r0 + (r1 - r0) * Math.min(1, Math.max(0, (px - f.l) / (f.w - f.l - f.r)));
-      var names = sessions().filter(function (s) { return s.start <= t && sessEnd(s) > t; });
-      cross.setAttribute("x1", X(t)); cross.setAttribute("x2", X(t)); cross.setAttribute("visibility", "visible");
-      showTip(evt, dt(t), [{ value: String(names.length), label: names.length === 1 ? "Spieler" : "Spieler", color: "var(--s1)" }].concat(
-        names.map(function (s) { return { value: s.player, color: color(s.player) }; })));
+      var px = evt.clientX != null && evt.type !== "focus" ? (evt.clientX - box.left) * f.w / box.width : f.w - f.r - 1;
+      var t = r0 + (r1 - r0) * Math.min(0.9999, Math.max(0, (px - f.l) / (f.w - f.l - f.r)));
+      var hh = Math.floor(t / 3600) * 3600, n = byHour[hh] || 0;
+      cross.setAttribute("x1", X(hh + 1800)); cross.setAttribute("x2", X(hh + 1800)); cross.setAttribute("visibility", "visible");
+      showTip(evt, dt(hh) + " – " + fmtHM.format(new Date((hh + 3600) * 1000)),
+        [{ value: String(n), label: "max. gleichzeitig online", color: "var(--s1)" }]);
     }
     hit.addEventListener("pointermove", at); hit.addEventListener("focus", at);
     hit.addEventListener("pointerleave", function () { cross.setAttribute("visibility", "hidden"); hideTip(); });
     hit.addEventListener("blur", function () { cross.setAttribute("visibility", "hidden"); hideTip(); });
 
-    // table: peak per day
     var byDay = {};
-    for (var i = 1; i < pts.length; i++) {
-      var k = startOfDay(pts[i][0]); byDay[k] = Math.max(byDay[k] || 0, pts[i][1]);
-    }
+    pts.forEach(function (p) { if (p[1]) { var k = startOfDay(p[0]); byDay[k] = Math.max(byDay[k] || 0, p[1]); } });
     table($("tbl-online"), ["Tag", "Max. gleichzeitig"], Object.keys(byDay).sort().reverse().slice(0, 60).map(function (k) {
       return [fmtD.format(new Date(k * 1000)), byDay[k]];
     }), [false, true]);
@@ -383,11 +377,7 @@
 
   function buckets(r0, r1) {
     var out = [], t, next, label;
-    if (state.range === "day") {
-      t = Math.floor(r0 / 3600) * 3600; next = function (x) { return x + 3600; };
-      label = function (x) { return fmtHM.format(new Date(x * 1000)); };
-      $("h-playtime").textContent = "Spielzeit pro Stunde";
-    } else if (state.range === "all" && r1 - r0 > 45 * 86400) {
+    if (state.range === "all" && r1 - r0 > 45 * 86400) {
       t = startOfWeek(r0); next = function (x) { return addDays(x, 7); };
       label = function (x) { return "KW ab " + fmtDM.format(new Date(x * 1000)); };
       $("h-playtime").textContent = "Spielzeit pro Woche";
@@ -406,9 +396,8 @@
     var players = Object.keys(colorOf);
     bs.forEach(function (b) {
       b.v = {}; b.total = 0;
-      sessions().forEach(function (s) {
-        var o = overlap(s.start, sessEnd(s), Math.max(b.a, r0), Math.min(b.b, r1));
-        if (o > 0) { b.v[s.player] = (b.v[s.player] || 0) + o; b.total += o; }
+      daily().forEach(function (r) {
+        if (r.day >= b.a && r.day < b.b && r.secs > 0) { b.v[r.player] = (b.v[r.player] || 0) + r.secs; b.total += r.secs; }
       });
     });
     var active = players.filter(function (p) { return bs.some(function (b) { return b.v[p]; }); });
@@ -606,16 +595,18 @@
 
   function renderPlayerStats(r0, r1) {
     var rows = playerTotals(r0, r1), all = {};
-    sessions().forEach(function (s) {
-      var a = all[s.player] || (all[s.player] = { first: s.start, last: sessEnd(s), online: false });
-      a.first = Math.min(a.first, s.start); a.last = Math.max(a.last, sessEnd(s)); if (s.end == null) a.online = true;
+    daily().forEach(function (r) {
+      var a = all[r.player] || (all[r.player] = { first: r.day, last: r.day });
+      a.first = Math.min(a.first, r.day); a.last = Math.max(a.last, r.day);
     });
+    var live = liveState() === "online" ? state.status.players_online.map(function (p) { return p.name; }) : [];
     table($("player-stats"), ["Spieler", "Spielzeit", "Sessions", "Ø Session", "Längste", "Tode", "Zuerst gesehen", "Zuletzt gesehen"],
       rows.map(function (p) {
         var a = all[p.player] || {};
         var name = el("span", null, el("span", { class: "swatch", style: "display:inline-block;margin-right:6px;background:" + color(p.player) }), p.player);
         return [name, dur(p.total, true), p.sessions, p.sessions ? dur(p.total / p.sessions, true) : "–", dur(p.longest, true), p.deaths,
-          a.first ? fmtD.format(new Date(a.first * 1000)) : "–", a.online ? "jetzt online" : (a.last ? dt(a.last) : "–")];
+          a.first ? fmtD.format(new Date(a.first * 1000)) : "–",
+          live.indexOf(p.player) >= 0 ? "jetzt online" : (a.last ? fmtD.format(new Date(a.last * 1000)) : "–")];
       }), [false, true, true, true, true, true, false, false]);
   }
 
@@ -684,7 +675,7 @@
 
   // theme toggle: dark (default look) <-> light
   var theme = null;
-  try { theme = localStorage.getItem("vs-theme"); } catch (e) { /* ignore */ }
+  try { theme = localStorage.getItem("vs-theme2"); } catch (e) { /* ignore */ }
   function applyTheme() {
     if (theme === "light") document.documentElement.setAttribute("data-theme", "light");
     else document.documentElement.removeAttribute("data-theme");
@@ -695,7 +686,7 @@
   applyTheme();
   $("theme-btn").addEventListener("click", function () {
     theme = theme === "light" ? null : "light";
-    try { if (theme) localStorage.setItem("vs-theme", theme); else localStorage.removeItem("vs-theme"); } catch (e) { /* ignore */ }
+    try { if (theme) localStorage.setItem("vs-theme2", theme); else localStorage.removeItem("vs-theme2"); } catch (e) { /* ignore */ }
     applyTheme();
   });
 

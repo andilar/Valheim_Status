@@ -37,6 +37,9 @@ Die Messung zeigt die Internetverbindung des Server-Macs, nicht den Ping der Spi
 Server-Log nicht her.
 
 ### Was nie veröffentlicht wird
+Auch keine einzelnen Sessions: `history.json` enthält nur Summen. Pro Spieler und Tag sind das Spielzeit,
+Anzahl Sessions, längste Session und Tode. Pro Stunde steht dort nur, wie viele Spieler gleichzeitig online waren,
+ohne Namen. Wer gerade online ist (Name und „online seit“), steht weiterhin in `status.json`.
 Server-Passwort, IP-Adressen, Dateipfade, rohe Log-Zeilen, PlayFab/Steam-IDs und die SQLite-Datei.
 `assert_sanitized()` bricht den Export ab, falls doch etwas danach aussieht.
 
