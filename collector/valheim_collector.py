@@ -50,14 +50,16 @@ CFG = {
 
 DAY_SECONDS = 1800  # one in-game day
 
-BOSSES = [  # progression order
-    ("defeated_eikthyr", "Eikthyr", "Wiesen"),
-    ("defeated_gdking", "Der Älteste", "Schwarzwald"),
-    ("defeated_bonemass", "Bonemass", "Sumpf"),
-    ("defeated_dragon", "Moder", "Berge"),
+BOSSES = [  # progression order, official German names
+    ("defeated_eikthyr", "Eikthyr", "Grasland"),
+    ("defeated_gdking", "Der Uralte", "Düsterwald"),
+    ("defeated_bonemass", "Knochenwanst", "Sumpfland"),
+    ("defeated_dragon", "Moder", "Gebirge"),
     ("defeated_goblinking", "Yagluth", "Ebenen"),
     ("defeated_queen", "Die Königin", "Nebellande"),
-    ("defeated_fader", "Fader", "Aschlande"),
+    ("defeated_fader", "Fader", "Aschenlande"),
+    # global key not known yet: status is published as unknown (None) until it is mapped
+    (None, "Kall Fimbulbringer", "Hoher Norden"),
 ]
 # Keys of newer content (e.g. defeated_writhan, elakingmole_defeated, jotun_killed) are not mapped:
 # their meaning is unverified, so they are published as raw "unknown keys" only.
@@ -72,10 +74,10 @@ MILESTONES = [
     ("hildir1", "Hildir-Quest 1 abgegeben"),
     ("hildir2", "Hildir-Quest 2 abgegeben"),
     ("hildir3", "Hildir-Quest 3 abgegeben"),
-    ("ashlandsocean", "Ozean der Aschlande erreicht"),
+    ("ashlandsocean", "Ozean der Aschenlande erreicht"),
 ]
 IGNORED_KEYS = {"activebosses 0"}  # runtime state, not progress
-KNOWN_KEYS = {k for k, _, _ in BOSSES} | {k for k, _ in MILESTONES}
+KNOWN_KEYS = {k for k, _, _ in BOSSES if k} | {k for k, _ in MILESTONES}
 
 log = logging.getLogger("collector")
 
@@ -713,6 +715,8 @@ def export(con, outdir):
     current = set(meta_get(con, "current_keys", []))
 
     def key_info(k):
+        if k is None:
+            return {"defeated": None, "defeated_at": None}  # unknown key: status unknown
         if k in current or k in keys:
             fs, initial = keys.get(k, (None, 1))
             return {"defeated": True, "defeated_at": None if initial else fs}
@@ -722,7 +726,7 @@ def export(con, outdir):
     milestones = [dict(key=k, name=n, **key_info(k)) for k, n in MILESTONES]
     unknown = sorted(k for k in (current | set(keys)) if k not in KNOWN_KEYS and k not in IGNORED_KEYS)
     defeated = sum(1 for b in bosses if b["defeated"])
-    tier = next((b["biome"] for b in bosses if not b["defeated"]), "Tiefer Norden")
+    tier = next((b["biome"] for b in bosses if not b["defeated"]), bosses[-1]["biome"])
 
     ping_now, ping_hist = ping_export(con, now)
     online = sorted(({"name": s.name, "since": s.start} for s in sessions if s.end is None and s.start),
@@ -736,6 +740,7 @@ def export(con, outdir):
         "players_online": online,
         "network": ping_now,
         "progress": {"defeated": defeated, "total": len(BOSSES), "current_tier": tier,
+                     "unknown": sum(1 for b in bosses if b["defeated"] is None),
                      "bosses": bosses, "new_bosses": [], "milestones": milestones,
                      "unknown_keys": unknown},
         "last_backup": (backups() or [None])[0],

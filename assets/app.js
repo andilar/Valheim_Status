@@ -248,14 +248,16 @@
 
   // ---------------------------------------------------------------- progress
   function bossCard(b) {
-    var status = b.defeated ? (b.defeated_at ? "✓ besiegt am " + fmtD.format(new Date(b.defeated_at * 1000)) : "✓ besiegt") : "○ noch nicht besiegt";
-    return el("div", { class: "boss" + (b.defeated ? " done" : "") },
+    var status = b.defeated == null ? "? Status unbekannt" :
+      b.defeated ? (b.defeated_at ? "✓ besiegt am " + fmtD.format(new Date(b.defeated_at * 1000)) : "✓ besiegt") : "○ noch nicht besiegt";
+    return el("div", { class: "boss" + (b.defeated ? " done" : ""), title: b.defeated == null ? "Der Eintrag dieses Bosses im Welt-Save ist noch nicht zugeordnet." : "" },
       el("div", { class: "n", text: b.name }), el("div", { class: "b", text: b.biome + (b.unverified ? " · Name ungeprüft" : "") }),
       el("div", { class: "s", text: status }));
   }
   function renderProgress() {
     var p = state.status.progress, w = state.status.world;
-    $("progress-text").textContent = p.defeated + " von " + p.total + " Hauptbossen besiegt · aktuelles Biom: " + p.current_tier;
+    $("progress-text").textContent = p.defeated + " von " + p.total + " Hauptbossen besiegt" +
+      (p.unknown ? " (" + p.unknown + " unbekannt)" : "") + " · aktuelles Biom: " + p.current_tier;
     $("progress-fill").style.width = (100 * p.defeated / p.total) + "%";
     var bar = $("progress-bar");
     bar.setAttribute("aria-valuemax", p.total); bar.setAttribute("aria-valuenow", p.defeated);
@@ -275,6 +277,7 @@
     var notes = [];
     if (p.bosses.some(function (b) { return b.defeated && !b.defeated_at; }))
       notes.push("„besiegt“ ohne Datum: Das war vor Beginn der Aufzeichnung, der Save enthält kein Datum.");
+    if (p.unknown) notes.push("„Status unbekannt“: Für diesen Boss ist noch nicht bekannt, unter welchem Eintrag er im Welt-Save steht.");
     if (!w.save_ok) notes.push("Der Welt-Save konnte zuletzt nicht gelesen werden, angezeigt wird der letzte bekannte Stand.");
     $("progress-note").textContent = notes.join(" ");
   }

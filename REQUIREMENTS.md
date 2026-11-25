@@ -56,13 +56,14 @@ Source: **world save**, not the log. The log only says "sending global keys", wi
 - Boss cards in progression order, defeated / not defeated:
   | Boss | Key | Biome |
   |------|-----|-------|
-  | Eikthyr | `defeated_eikthyr` | Meadows |
-  | The Elder | `defeated_gdking` | Black Forest |
-  | Bonemass | `defeated_bonemass` | Swamp |
-  | Moder | `defeated_dragon` | Mountains |
-  | Yagluth | `defeated_goblinking` | Plains |
-  | The Queen | `defeated_queen` | Mistlands |
-  | Fader | `defeated_fader` | Ashlands |
+  | Eikthyr | `defeated_eikthyr` | Grasland |
+  | Der Uralte | `defeated_gdking` | Düsterwald |
+  | Knochenwanst | `defeated_bonemass` | Sumpfland |
+  | Moder | `defeated_dragon` | Gebirge |
+  | Yagluth | `defeated_goblinking` | Ebenen |
+  | Die Königin | `defeated_queen` | Nebellande |
+  | Fader | `defeated_fader` | Aschenlande |
+  | Kall Fimbulbringer | unknown (shown as "status unknown" until mapped) | Hoher Norden |
 - Mini-bosses & milestones: Hildir quests (`hildir1-3`), troll/surtling/bat/serpent first kills, Ashlands ocean.
 - "World progress" bar: bosses defeated / total; current biome tier derived from it.
 - Keys of newer content (`defeated_writhan`, `elakingmole_defeated`, `jotun_killed`) are **not** bosses defeated
