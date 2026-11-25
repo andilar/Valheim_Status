@@ -69,7 +69,8 @@ Source: **world save**, not the log. The log only says "sending global keys", wi
 - Keys of newer content (`defeated_writhan`, `elakingmole_defeated`, `jotun_killed`) are **not** bosses defeated
   as named; meaning unverified, so they are shown only as raw keys until mapped by the owner.
 - In-game day: world clock (`netTime`, float64 seconds) from the save header (int32 version, float64 netTime,
-  before the gzip stream) ÷ 1800 s per day. Fallback: the `Time …, day:N` line logged when players sleep.
+  before the gzip stream): day = floor((netTime − 0.15 × 1800) / 1800), because a day starts in the
+  morning (verified against all 51 `day:N` log lines). Fallback: the `Time …, day:N` line logged when players sleep.
   The log's `World time` in autobackup lines is only the server's uptime, **not** the world clock.
 - Date a boss was defeated: no timestamp in the save. The collector records the date a key first appears
   (accurate from now on; existing kills are shown as "defeated, date unknown").

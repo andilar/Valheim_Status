@@ -49,6 +49,8 @@ CFG = {
 }
 
 DAY_SECONDS = 1800  # one in-game day
+DAY_START = 0.15    # a new day begins in the morning, not at midnight (matches the game's own
+                    # "day:N" log lines 51/51; plain t/1800 is one day ahead at night)
 
 BOSSES = [  # progression order, official German names
     ("defeated_eikthyr", "Eikthyr", "Grasland"),
@@ -718,7 +720,7 @@ def export(con, outdir):
     # server's uptime); fall back to the day printed when players last slept
     day, day_at = None, None
     if world.get("net_time") is not None:
-        day, day_at = int(world["net_time"] // DAY_SECONDS), world.get("mtime")
+        day, day_at = int((world["net_time"] - DAY_START * DAY_SECONDS) // DAY_SECONDS), world.get("mtime")
     else:
         for r in reversed(runs):
             ts, d = last_event(r, "day")
