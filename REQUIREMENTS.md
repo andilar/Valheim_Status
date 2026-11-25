@@ -22,9 +22,19 @@ Server: `Rethen_LAN_FTW`, world `eleventh heaven`, macOS 12 Mac running as launc
 - Server process CPU and memory
 
 ### F2 Players
+- **Online now**: character names currently on the server, and since when ("Ragnar — online 1 h 12 min")
+- **Leaderboard: most time played**, ranked by total playtime, with period filter (this week / month / all time)
+- Per-player stats: total playtime, sessions, average and longest session, first seen, last seen, deaths
 - Session list: player, join time, leave time, duration
-- Total playtime per player, last seen, sessions count
-- Deaths per player (from respawn `Got character ZDOID from X : 0:0` lines — verify)
+- Deaths per player: `Got character ZDOID from X : 0:0` = death, followed by a respawn line
+
+**Attribution logic (log limitations)**
+- Join: `Player joined` → `Got handshake from client playfab/<ID>` → `Got character ZDOID from <Name>` links the client ID to the character name.
+- Leave: `Keep socket for playfab/<ID>` (connection drop) names the client exactly; a normal quit (`RPC_Disconnect`) does not.
+- Unnamed leaves are resolved by the `now N player(s)` count; when the count reaches 0 all sessions are closed.
+- A leave that can't be attributed with certainty is flagged; the session is closed at the best estimate and corrected when the count later disagrees.
+- Server restart or crash closes all open sessions at the last log timestamp.
+- Client IDs are used internally only, never published.
 
 ### F3 History & charts
 - Players online over time (day / week / all)
