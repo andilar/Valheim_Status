@@ -174,3 +174,8 @@ footer a { color: inherit; }
 @media (forced-colors: active) {
   .badge .dot, .swatch, .fill, .bar-fill { forced-color-adjust: none; }
 }
+
+/* world map */
+.map-link { display: block; border-radius: 8px; overflow: hidden; background: #0b0b14; }
+.map-link img { display: block; width: 100%; height: auto; }
+.card a { color: inherit; }
