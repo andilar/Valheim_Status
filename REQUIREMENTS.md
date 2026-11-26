@@ -25,7 +25,8 @@ Server: `Rethen_LAN_FTW`, world `eleventh heaven`, macOS 12 Mac running as launc
 - **Online now**: character names currently on the server, and since when ("Ragnar — online 1 h 12 min")
 - **Leaderboard: most time played**, ranked by total playtime, with period filter (this week / month / all time)
 - Per-player stats: total playtime, sessions, average and longest session, first seen, last seen, deaths
-- Session list: player, join time, leave time, duration
+- No public session list. Individual join/leave times and session records remain in the local SQLite database.
+- `history.json` contains daily per-player aggregates only: playtime, number of sessions, longest session and deaths.
 - Deaths per player: `Got character ZDOID from X : 0:0` = death, followed by a respawn line
 
 **Attribution logic (log limitations)**
@@ -37,7 +38,7 @@ Server: `Rethen_LAN_FTW`, world `eleventh heaven`, macOS 12 Mac running as launc
 - Client IDs are used internally only, never published.
 
 ### F3 History & charts
-- Players online over time (day / week / all)
+- Players online over time (day / week / all), published as the maximum concurrent player count per hour without names
 - Playtime per player per week
 - Server uptime / restarts / crashes timeline
 - World backups: list and time of last backup
@@ -93,7 +94,8 @@ player's own PC, not on the server.
 - GitHub Pages serves the static dashboard from `main`; the page fetches the JSON from the `data` branch.
 - Push auth: SSH deploy key with write access to this repo only (`~/.ssh/valheim_status_deploy`).
 - The site is public, so no real login is possible. Treat everything published as public.
-- Never published: server password, public and LAN IP address, file paths, raw log lines, PlayFab/Steam IDs, the SQLite file.
+- Never published: server password, public and LAN IP address, file paths, raw log lines, PlayFab/Steam IDs,
+  completed individual session records or their join/leave times, the SQLite file.
 - Nothing on GitHub can change the server (read-only by design).
 
 ### N2 Operations
@@ -112,6 +114,7 @@ player's own PC, not on the server.
 
 ## Resolved
 - Dashboard is fully public: player names, playtime and join code are shown.
+- Current online players and their online-since time are public; completed individual sessions are not published.
 - IP address is never shown (public or LAN); players join via join code.
 - Live updates every 10 s were considered and rejected: GitHub's ~5 min CDN cache and API rate limits
   make it impossible, and pushing every 10 s would risk the GitHub account. Decision: GitHub-only,
